@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# A simple script for removing old kernel packages on Ubuntu.
+
+sudo apt-get remove $(\
+    dpkg -l |\
+    grep ^ii |\
+    grep linux-image |\
+    grep -v linux-image-generic |\
+    grep -v linux-image-`uname -r` |\
+    awk '{ print $2}'\
+)
