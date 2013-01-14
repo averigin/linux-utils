@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Packages the contents of a directory into a .deb package.
+
+set -e
+
+function print_usage {
+    echo "Packages the contents of a directory into a .deb package.    
+Usage:
+    ${BASH_SOURCE[0]} [directory] [package-file]
+
+    directory: Directory to package. [Default: current directory]
+    package-file: Name of the generated package file [Default: <directory>.deb]
+"
+}
+
+function error {
+    local message=$1
+    local return_code=${2:-1}
+
+    echo "$message" > /dev/stderr
+    exit "$return_code"
+}
+
+function update_size {
+    local directory="$1"
+    # Calculate the new install size (in kB)
+    local size="$(du --exclude 'DEBIAN' -s -k "$directory"| awk '{print $1}')"
+    # Update the control file
+    sed -i "s/\(Installed-Size:\s*\)[0-9]\+/\1$size/" "${directory}/DEBIAN/control"
+}
+
+function update_md5sums {
+    local directory="$1"
+    (cd "$directory" && find . -type f ! -regex '.*?debian-binary.*' ! -regex '.*?DEBIAN.*' -printf '%P ' | xargs md5sum > DEBIAN/md5sums)
+}
+
+function build_deb {
+    local directory="$1"
+    local deb_file="$2"
+
+    dpkg-deb -b "$directory" "$deb_file"
+}
+
+function has_debian_directory {
+    local directory="$1"
+    [[ -d "${directory}/DEBIAN" ]] || error "'DEBIAN' directory missing from '$DIRECTORY'."
+}
+
+function directory_exists {
+    local directory="$1"
+    [[ -d "${directory}" ]] || error "'$DIRECTORY' does not exist."
+}
+
+if [ $# -eq 1 ];then
+    if [[ "x$1" == "x-h" ]] || [[ "x$1" == "x--help" ]]; then
+        print_usage
+        exit 0
+    fi
+fi
+
+DIRECTORY=${1:-"$(pwd)"}
+DEB_FILE=${2:-"${DIRECTORY}.deb"}
+
+directory_exists "$DIRECTORY"
+has_debian_directory "$DIRECTORY"
+
+update_size "$DIRECTORY"
+update_md5sums "$DIRECTORY"
+build_deb "$DIRECTORY" "$DEB_FILE"
