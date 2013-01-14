@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+
+function error {
+	local message=$1
+	echo "$message" > /dev/stderr
+	exit 1
+}
+
+if [ ! -x /usr/bin/ar ]; then
+	error 'ar not installed'
+	exit 1
+fi
+
+FILE=$1
+if [ ! -r "$FILE" ]; then
+	error "'${FILE}' does not exist"
+fi
+
+DIRECTORY=${FILE/%.deb/}
+if [ -e "$DIRECTORY" ]; then
+	read -p "$DIRECTORY already exists. Replace [y/N]?"
+	[[ $REPLY =~ y[e]?[s]? ]] || exit
+fi
+rm -rf "$DIRECTORY" && mkdir -p "$DIRECTORY"
+
+dpkg-deb --extract "$FILE" "$DIRECTORY"
+mkdir "${DIRECTORY}/DEBIAN"
+dpkg-deb --control "$FILE" "${DIRECTORY}/DEBIAN"
